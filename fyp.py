@@ -1,87 +1,71 @@
+# Import libraries
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
-from tkinter import Tk, ttk, Label
-import tkinter.messagebox as msg
+from sklearn.metrics import classification_report, accuracy_score
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# --- Step 1: Prepare training data ---
-training_data = {
+# Step 1: Define dataset from document
+data = {
     "Service Quality": [8, 6, 4, 6, 4],
     "Response Time": [5, 7, 8, 6, 5],
     "Product Satisfaction": [9, 7, 6, 1, 3]
 }
 
-# Function to calculate feedback score using the formula
-def calculate_score(sq, rt, ps):
-    return round(0.4 * sq + 0.3 * (10 - rt) + 0.3 * ps)
+# Step 2: Apply the given formula to calculate raw score
+def calculate_raw_score(sq, rt, ps):
+    return 0.4 * sq + 0.3 * (10 - rt) + 0.3 * ps
 
-# Create DataFrame and calculate scores
-df = pd.DataFrame(training_data)
-df["Feedback Score"] = df.apply(lambda row: calculate_score(
+# Step 3: Map raw score to final Feedback Score (1 to 5)
+def map_to_feedback_score(raw):
+    if raw >= 8:
+        return 5
+    elif raw >= 6.5:
+        return 4
+    elif raw >= 5:
+        return 3
+    elif raw >= 3.5:
+        return 2
+    else:
+        return 1
+
+# Step 4: Create DataFrame and compute scores
+df = pd.DataFrame(data)
+df["Raw Score"] = df.apply(lambda row: calculate_raw_score(
     row["Service Quality"], row["Response Time"], row["Product Satisfaction"]), axis=1)
+df["Feedback Score"] = df["Raw Score"].apply(map_to_feedback_score)
 
-# Train the Decision Tree model
+print("📦 Final Dataset with Calculated Scores:\n")
+print(df)
+
+# Step 5: Prepare features and labels
 X = df[["Service Quality", "Response Time", "Product Satisfaction"]]
 y = df["Feedback Score"]
+
+# Step 6: Split into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.4, random_state=42)
+
+# Step 7: Train Decision Tree Classifier
 model = DecisionTreeClassifier()
-model.fit(X, y)
+model.fit(X_train, y_train)
 
-# --- Step 2: Collect up to 20 customer inputs ---
-customer_feedbacks = []
-max_customers = 20
+# Step 8: Make predictions on test data
+y_pred = model.predict(X_test)
 
-print("\n📥 CUSTOMER FEEDBACK ENTRY")
+# Step 9: Evaluate model
+print("\n🔍 Model Accuracy:", accuracy_score(y_test, y_pred))
+print("\n📊 Classification Report:\n", classification_report(y_test, y_pred))
 
-for i in range(max_customers):
-    print(f"\n➡️ Customer #{i + 1}")
+# Step 10: Predict for a new input (as per document)
+new_input = [[8, 3, 9]]  # Service Quality, Response Time, Product Satisfaction
+predicted_score = model.predict(new_input)[0]
+print(f"\n🔮 Predicted Feedback Score for {new_input[0]} → {predicted_score}")
 
-    try:
-        sq = int(input("Service Quality (1-10): "))
-        rt = int(input("Response Time (1-10): "))
-        ps = int(input("Product Satisfaction (1-10): "))
-
-        # Predict feedback score
-        pred_score = model.predict([[sq, rt, ps]])[0]
-
-        # Store data
-        customer_feedbacks.append({
-            "Customer #": i + 1,
-            "Service Quality": sq,
-            "Response Time": rt,
-            "Product Satisfaction": ps,
-            "Predicted Score": pred_score
-        })
-
-        if i < max_customers - 1:  # Ask only if not already at 20
-            cont = input("Do you want to add another customer? (yes/no): ").strip().lower()
-            if cont != "yes":
-                break
-
-    except ValueError:
-        print("❌ Invalid input. Please enter numbers from 1 to 10.")
-        break
-
-# --- Step 3: GUI display of results ---
-def show_gui(data):
-    root = Tk()
-    root.title("Customer Feedback Results")
-
-    Label(root, text="📊 All Customer Feedback Scores", font=("Arial", 14, "bold")).pack(pady=10)
-
-    tree = ttk.Treeview(root)
-    tree["columns"] = list(data[0].keys())
-    tree["show"] = "headings"
-
-    for col in tree["columns"]:
-        tree.heading(col, text=col)
-        tree.column(col, anchor="center")
-
-    for row in data:
-        tree.insert("", "end", values=list(row.values()))
-
-    tree.pack(expand=True, fill="both", padx=20, pady=10)
-    root.mainloop()
-
-if customer_feedbacks:
-    show_gui(customer_feedbacks)
-else:
-    msg.showinfo("No Data", "No customer feedback entered.")
+# Step 11: Optional - Correlation Heatmap
+plt.figure(figsize=(6, 4))
+sns.heatmap(df.drop(columns=["Feedback Score"]).corr(), annot=True, cmap="coolwarm")
+plt.title("📊 Feature Correlation Heatmap")
+plt.tight_layout()
+plt.show()
